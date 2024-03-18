@@ -1,0 +1,20 @@
+{
+  "name": "newv",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Swapnil Bhatnagar",
+  "license": "ISC",
+  "dependencies": {
+    "@material-ui/core": "^4.12.4",
+    "ejs": "^3.1.9",
+    "express": "^4.18.3",
+    "peer": "^1.0.2",
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1"
+  }
+}
