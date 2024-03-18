@@ -117,7 +117,7 @@ const cancel = () => { // Hide our invite modalwhen we click cancel
 
 const copy = async() => { // copy our Invitation link when we press the copy button
     const roomid = document.getElementById("roomid").innerText;
-    await navigator.clipboard.writeText("http://localhost:3030/join/" + roomid);
+    await navigator.clipboard.writeText(window.location.origin + "/join/" + roomid);
 };
 const invitebox = () => { // SHow our model when we click
     $("#getCodeModal").modal("show");
