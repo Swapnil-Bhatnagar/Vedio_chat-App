@@ -151,6 +151,14 @@
 
     hostTab.addEventListener("click", () => setMode("host"));
     joinTab.addEventListener("click", () => setMode("join"));
+
+    // Opened from an invite link: jump straight to "Join a room" with the meeting ID filled in
+    const invitedRoom = new URLSearchParams(location.search).get("room");
+    if (invitedRoom) {
+      setMode("join");
+      document.getElementById("meeting-id").value = invitedRoom;
+      document.getElementById("join-name").focus();
+    }
   </script>
 </body>
 </html>
