@@ -1,66 +1,144 @@
 const express = require("express");
-const app = express();
-const server = require("http").Server(app);
-const { v4: uuidv4 } = require("uuid");
-const io = require("socket.io")(server);
-const { ExpressPeerServer } = require("peer");
-const url = require("url");
-const peerServer = ExpressPeerServer(server, { // Here we are actually defining our peer server that we want to host
-    debug: true,
-});
+const http = require("http");
+const os = require("os");
 const path = require("path");
+const { v4: uuidv4 } = require("uuid");
+const { ExpressPeerServer } = require("peer");
+
+const PORT = process.env.PORT || 3030;
+const ROOM_LIMIT = 12;
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_NOTES_LENGTH = 15000;
+const MAX_NAME_LENGTH = 60;
+const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const REACTIONS = ["👍", "👏", "❤️", "😂", "🎉", "🙌"];
+
+const app = express();
+const server = http.createServer(app);
+const io = require("socket.io")(server);
+const peerServer = ExpressPeerServer(server, {});
 
 app.set("view engine", "ejs");
 app.use("/public", express.static(path.join(__dirname, "static")));
-app.use("/peerjs", peerServer); // Now we just need to tell our application to server our server at "/peerjs".Now our server is up and running
+app.use("/public", express.static(path.join(__dirname, "public")));
+app.use("/peerjs", peerServer);
 
-app.get("/", (req, res) => { // On the '/' route
-    res.sendFile(path.join(__dirname, "static", "index.html")); // Send our Inro page file(index.js) which in the static folder.
+// rooms: roomId -> { participants: Map(socketId -> {peerId, name, mic, cam}), notes }
+const rooms = new Map();
+
+const cleanName = (name) =>
+    String(name || "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LENGTH) || "Guest";
+
+// Lets the host build an invite link other devices can actually reach (localhost is only valid on this PC)
+const lanAddresses = () => {
+    const skip = /vethernet|virtualbox|vmware|wsl|hyper-v|docker|loopback/i;
+    const found = [];
+    for (const [name, list] of Object.entries(os.networkInterfaces())) {
+        if (skip.test(name)) continue;
+        for (const net of list || []) {
+            if ((net.family === "IPv4" || net.family === 4) && !net.internal) found.push(net.address);
+        }
+    }
+    return found.sort((a, b) => Number(b.startsWith("192.168.")) - Number(a.startsWith("192.168.")));
+};
+
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "static", "index.html"));
 });
 
-app.get("/join", (req, res) => { // Our intro page redirects us to /join route with our query strings(We reach here when we host a meeting)
-    res.redirect( // When we reach /join route we redirect the user to a new unique route with is formed using Uuid 
-        url.format({ // The url module provides utilities for URL resolution and parsing.
-            pathname: `/join/${uuidv4()}`, // Here it returns a string which has the route and the query strings.
-            query: req.query, // For Eg : /join/A_unique_Number?Param=Params. So we basically get redirected to our old_Url/join/id?params
-        })
-    );
+app.get("/api/info", (req, res) => {
+    res.json({ lan: lanAddresses() });
 });
 
-app.get("/joinold", (req, res) => { //Our intro page redirects us to /joinold route with our query strings(We reach here when we join a meeting)
-    res.redirect(
-        url.format({
-            pathname: req.query.meeting_id,
-            query: req.query,
-        })
-    );
+// "New meeting" form: create a unique room and keep the host's name
+app.get("/join", (req, res) => {
+    const name = encodeURIComponent(cleanName(req.query.name));
+    res.redirect(`/join/${uuidv4()}?name=${name}`);
 });
 
-app.get("/join/:rooms", (req, res) => { // When we reach here after we get redirected to /join/join/A_unique_Number?params
-    res.render("room", { roomid: req.params.rooms, Myname: req.query.name }); // we render our ejs file and pass the data we need in it
-}); // i.e we need the roomid and the username
+// "Join a room" form: accepts either a bare meeting ID or a full invite link
+app.get("/joinold", (req, res) => {
+    const raw = String(req.query.meeting_id || "").trim();
+    const id = raw.split(/[?#]/)[0].split("/").filter(Boolean).pop() || "";
+    if (!ROOM_ID_PATTERN.test(id)) return res.redirect("/");
+    res.redirect(`/join/${id}?name=${encodeURIComponent(cleanName(req.query.name))}`);
+});
 
-io.on("connection", (socket) => { // When a user coonnects to our server
-    socket.on("join-room", (roomId, id, myname) => { // When the socket a event 'join room' event
-        socket.join(roomId); // Join the roomid
-        socket.to(roomId).broadcast.emit("user-connected", id, myname);// emit a 'user-connected' event to tell all the other users
-        // in that room that a new user has joined
+app.get("/join/:rooms", (req, res) => {
+    const roomid = req.params.rooms;
+    if (!ROOM_ID_PATTERN.test(roomid)) return res.redirect("/");
+    // Someone opened an invite link directly: ask for their name first
+    if (!String(req.query.name || "").trim()) return res.redirect(`/?room=${encodeURIComponent(roomid)}`);
+    res.render("room", { roomid, Myname: cleanName(req.query.name) });
+});
 
-        socket.on("messagesend", (message) => { 
-            console.log(message);
-            io.to(roomId).emit("createMessage", message);
-        });
+const publicInfo = (socketId, p) => ({ id: socketId, peerId: p.peerId, name: p.name, mic: p.mic, cam: p.cam });
 
-        socket.on("tellName", (myname) => {
-            console.log(myname);
-            socket.to(roomId).broadcast.emit("AddName", myname);
-        });
+io.on("connection", (socket) => {
+    let roomId = null;
 
-        socket.on("disconnect", () => { // When a user disconnects or leaves
-            socket.to(roomId).broadcast.emit("user-disconnected", id);
-        });
+    socket.on("join-room", (room, peerId, name, ack) => {
+        const reply = typeof ack === "function" ? ack : () => {};
+        if (roomId) return reply({ error: "Already joined" });
+        if (!ROOM_ID_PATTERN.test(String(room)) || typeof peerId !== "string" || !peerId) {
+            return reply({ error: "Invalid room" });
+        }
+        let state = rooms.get(room);
+        if (!state) {
+            state = { participants: new Map(), notes: "" };
+            rooms.set(room, state);
+        }
+        if (state.participants.size >= ROOM_LIMIT) return reply({ error: "This room is full" });
+
+        const me = { peerId, name: cleanName(name), mic: false, cam: false };
+        const others = [...state.participants].map(([id, p]) => publicInfo(id, p));
+        state.participants.set(socket.id, me);
+        roomId = room;
+        socket.join(room);
+        socket.to(room).emit("user-joined", publicInfo(socket.id, me));
+        reply({ ok: true, selfId: socket.id, participants: others, notes: state.notes });
+    });
+
+    const mine = () => rooms.get(roomId)?.participants.get(socket.id);
+
+    socket.on("media-state", (s) => {
+        const me = mine();
+        if (!me || !s) return;
+        me.mic = !!s.mic;
+        me.cam = !!s.cam;
+        socket.to(roomId).emit("media-state", { id: socket.id, mic: me.mic, cam: me.cam });
+    });
+
+    socket.on("chat", (text) => {
+        const me = mine();
+        const message = String(text || "").trim().slice(0, MAX_MESSAGE_LENGTH);
+        if (!me || !message) return;
+        io.to(roomId).emit("chat", { id: socket.id, name: me.name, text: message, time: Date.now() });
+    });
+
+    socket.on("notes", (text) => {
+        const state = rooms.get(roomId);
+        if (!state || !mine()) return;
+        state.notes = String(text || "").slice(0, MAX_NOTES_LENGTH);
+        socket.to(roomId).emit("notes", state.notes);
+    });
+
+    socket.on("reaction", (emoji) => {
+        if (!mine() || !REACTIONS.includes(emoji)) return;
+        io.to(roomId).emit("reaction", { id: socket.id, emoji });
+    });
+
+    socket.on("disconnect", () => {
+        const state = rooms.get(roomId);
+        const me = state?.participants.get(socket.id);
+        if (!me) return;
+        state.participants.delete(socket.id);
+        socket.to(roomId).emit("user-left", { id: socket.id, peerId: me.peerId, name: me.name });
+        if (state.participants.size === 0) rooms.delete(roomId);
     });
 });
 
-server.listen(process.env.PORT || 3030); // Listen on port 3030.
-// process.env.PORT || 3030 means  use port 3000 unless there exists a preconfigured port
+server.listen(PORT, () => {
+    console.log(`MeetSpace running:\n  This PC:  http://localhost:${PORT}`);
+    lanAddresses().forEach((ip) => console.log(`  Network:  http://${ip}:${PORT}`));
+});
