@@ -1,39 +1,156 @@
+
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Zoom Clone</title>
-    <link rel="stylesheet" href="public/style.css" />
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="description" content="MeetSpace makes team conversations simple. Start a video meeting or join your team instantly." />
+  <title>MeetSpace — Work better together</title>
+  <link rel="stylesheet" href="/public/style.css" />
 </head>
-
 <body>
-    <div class="Name-Page">
-        <div class="form">
-            <form class="known-form" action="/join">
-                <input type="text" placeholder="Enter your name" name="name" />
-                <button>Host a Meeting</button>
-                <p><a href="javascript:show()">Join Meeting?</a></p>
-            </form>
+  <header class="navbar">
+    <a href="/" class="brand">
+      <span class="brand-icon">m</span>
+      <span>meetspace</span>
+    </a>
+    <span class="nav-label">Video collaboration, simplified</span>
+  </header>
 
-            <form class="unknown-form" action="/joinold">
-                <input type="text" placeholder="Enter your name" name="name" />
-                <input type="text" placeholder="Enter Meeting Id" name="meeting_id" />
-                <button>Join Meeting</button>
-                <p>
-                    <a href="javascript:show()">Host Meeting?</a>
-                </p>
-            </form>
+  <main class="hero">
+    <section class="hero-copy">
+      <div class="eyebrow">
+        <span class="status-dot"></span>
+        YOUR SPACE TO CONNECT
+      </div>
+
+      <h1>Good conversations.<br />
+        <span>Better ideas.</span>
+      </h1>
+
+      <p class="hero-description">
+        Bring your people together, share ideas, and get things
+        moving — wherever everyone happens to be.
+      </p>
+
+      <div class="feature-list">
+        <div class="feature">
+          <span class="feature-icon">↗</span>
+          <div>
+            <strong>One-click meetings</strong>
+            <p>Create a room and invite your team.</p>
+          </div>
         </div>
-    </div>
-    <script>
-        function show() {
-            $('form').animate({ height:"toggle",opacity:"toggle"},"slow")
-        }
-    </script>
-</body>
+        <div class="feature">
+          <span class="feature-icon">◎</span>
+          <div>
+            <strong>Face-to-face connection</strong>
+            <p>Meet through live video and chat.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">⌁</span>
+          <div>
+            <strong>Easy to get started</strong>
+            <p>No complicated setup to join a room.</p>
+          </div>
+        </div>
+      </div>
 
+      <p class="hero-footer">MADE FOR TEAMS THAT MOVE IDEAS FORWARD</p>
+    </section>
+
+    <section class="meeting-card">
+      <div class="card-heading">
+        <div>
+          <span class="section-label">YOUR WORKSPACE</span>
+          <h2 id="form-title">Start a conversation</h2>
+          <p id="form-description">Create a new room for your team.</p>
+        </div>
+        <div class="card-symbol">✳</div>
+      </div>
+
+      <div class="mode-switch">
+        <button type="button" class="mode-button active"
+          id="host-tab" aria-pressed="true">
+          New meeting
+        </button>
+        <button type="button" class="mode-button"
+          id="join-tab" aria-pressed="false">
+          Join a room
+        </button>
+      </div>
+
+      <form id="host-form" action="/join" method="GET">
+        <label for="host-name">Your name</label>
+        <input id="host-name" type="text" name="name"
+          placeholder="e.g. Swapnil" maxlength="60" required
+          autocomplete="name" />
+
+        <button class="primary-button" type="submit">
+          Create meeting <span>→</span>
+        </button>
+      </form>
+
+      <form id="join-form" action="/joinold" method="GET" hidden>
+        <label for="join-name">Your name</label>
+        <input id="join-name" type="text" name="name"
+          placeholder="Enter your name" maxlength="60" required
+          autocomplete="name" />
+
+        <label for="meeting-id">Meeting ID</label>
+        <input id="meeting-id" type="text" name="meeting_id"
+          placeholder="Paste the room ID" required />
+
+        <button class="primary-button" type="submit">
+          Join meeting <span>→</span>
+        </button>
+      </form>
+
+      <div class="card-note">
+        <span class="lock-icon">◇</span>
+        Make sure you're ready before joining your call.
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <span>MeetSpace</span>
+    <span>Make room for better conversations.</span>
+  </footer>
+
+  <script>
+    const hostTab = document.getElementById("host-tab");
+    const joinTab = document.getElementById("join-tab");
+    const hostForm = document.getElementById("host-form");
+    const joinForm = document.getElementById("join-form");
+    const title = document.getElementById("form-title");
+    const description = document.getElementById("form-description");
+
+    function setMode(mode) {
+      const joining = mode === "join";
+
+      hostForm.hidden = joining;
+      joinForm.hidden = !joining;
+
+      hostTab.classList.toggle("active", !joining);
+      joinTab.classList.toggle("active", joining);
+
+      hostTab.setAttribute("aria-pressed", String(!joining));
+      joinTab.setAttribute("aria-pressed", String(joining));
+
+      title.textContent = joining
+        ? "Welcome to your meeting"
+        : "Start a conversation";
+
+      description.textContent = joining
+        ? "Enter the details shared by your host."
+        : "Create a new room for your team.";
+    }
+
+    hostTab.addEventListener("click", () => setMode("host"));
+    joinTab.addEventListener("click", () => setMode("join"));
+  </script>
+</body>
 </html>
