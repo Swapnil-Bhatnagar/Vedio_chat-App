@@ -1,102 +1,211 @@
+
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <link rel="stylesheet" href="/public/styles.css">
-    <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.3.1/peerjs.min.js.map"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
-    <script src="/socket.io/socket.io.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d12">
+  <title>MeetSpace — Video Room</title>
+  <meta name="description" content="A collaborative video meeting room.">
 
-    <script>
-        const myname = "<%= Myname %>"
-        const roomId = "<%= roomid %>"
-    </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="/public/styles.css">
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js" defer></script>
+  <script src="/public/main.js" defer></script>
 </head>
 
 <body>
-    <div class="modal fade" id="getCodeModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h4 class="modal-title">Invite People</h4>
-                </div>
-                <div class="modal-body">
-                    <p id="roomid"><strong><%= roomid %></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-white" onclick="cancel()">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="copy()">Copy</button>
-                </div>
-            </div>
+  <div
+    class="app-shell"
+    id="meetingApp"
+    data-name="<%= Myname %>"
+    data-room-id="<%= roomid %>"
+  >
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="MeetSpace home">
+        <span class="brand-mark"><i class="fa-solid fa-video"></i></span>
+        <span>meet<span class="brand-accent">space</span></span>
+      </a>
+
+      <div class="room-info">
+        <span class="live-dot"></span>
+        <span id="roomTitle">Team meeting</span>
+        <span class="room-divider">/</span>
+        <span class="room-code" id="roomCode"></span>
+        <button class="icon-button compact" id="copyRoomBtn" title="Copy invitation link" aria-label="Copy invitation link">
+          <i class="fa-regular fa-copy"></i>
+        </button>
+      </div>
+
+      <div class="topbar-right">
+        <span class="connection-label" id="connectionStatus">
+          <span class="status-dot"></span> Connecting
+        </span>
+        <button class="avatar" id="profileAvatar" title="Your profile" aria-label="Your profile">U</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="meeting-area">
+        <div class="stage-heading">
+          <div>
+            <h1>Your meeting room</h1>
+            <p id="meetingSubtitle">Connect, collaborate, get things done.</p>
+          </div>
+          <div class="stage-meta">
+            <span class="participant-count">
+              <i class="fa-solid fa-users"></i>
+              <span id="participantCount">1</span>
+            </span>
+            <span class="meeting-clock" id="meetingClock">00:00</span>
+          </div>
         </div>
-    </div>
-    <div class="mainclone">
-        <div class="main_left">
-            <div class="main_videos">
-                <div id="video-grids">
-                </div>
-            </div>
-            <div class="main_controls">
-                <div class="main_controls_block">
-                    <div class="main_controls_button" id="mic" onclick="muteUnmute()">
-                        <i class="fas fa-microphone-slash"></i>
-                        <span>Mute</span>
-                    </div>
 
-                    <div class="main_controls_button" id="video" onclick="VideomuteUnmute()">
-                        <i class="fas fa-video-slash"></i>
-                        <span>Stop Video</span>
-                    </div>
-                </div>
-                <div class="main_controls_block">
-                    <div class="main_controls_button" onclick="invitebox()">
-                        <i class="fas fa-user-plus"></i>
-                        <span>Invite</span>
-                    </div>
-                    <div class="main_controls_button">
-                        <i class="fas fa-user-friends"></i>
-                        <span>Participants</span>
-                    </div>
-                    <div class="main_controls_button" onclick="showchat()">
-                        <i class="fas fa-comment-alt"></i>
-                        <span>Chat</span>
-                    </div>
-                </div>
-                <div class="main_controls_block">
-                    <div class="main_controls_button leave_red">
-                        <span class="leave_meeting"><a href="/">Leave Meeting</a></span>
-                    </div>
-                </div>
+        <div class="video-grid" id="video-grids">
+          <article class="video-tile local-tile" id="localTile">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <div class="video-placeholder" id="localPlaceholder">
+              <span class="person-avatar" id="localInitial">U</span>
+              <span>Camera is off</span>
             </div>
+            <div class="tile-top-label">
+              <span class="live-dot"></span>
+              You
+            </div>
+            <div class="tile-bottom-label">
+              <span id="localName">You</span>
+              <span class="tile-status" id="localMicStatus" title="Microphone on">
+                <i class="fa-solid fa-microphone"></i>
+              </span>
+            </div>
+          </article>
         </div>
-        <div class="main_right" id="chat">
-            <div class="main_right_header">
-                <h6>Chat Area</h6>
-            </div>
-            <div class="main__chat_window" id="main__chat_window">
-                <ul class="messages" id="messageadd">
 
-                </ul>
+        <div class="call-notice" id="callNotice" role="status" aria-live="polite">
+          Preparing your meeting…
+        </div>
 
+        <div class="toolbar">
+          <div class="toolbar-group">
+            <button class="control-button" id="micBtn" aria-label="Mute microphone" aria-pressed="false">
+              <i class="fa-solid fa-microphone"></i>
+              <span>Mic</span>
+            </button>
+            <button class="control-button" id="cameraBtn" aria-label="Turn camera off" aria-pressed="false">
+              <i class="fa-solid fa-video"></i>
+              <span>Camera</span>
+            </button>
+          </div>
+
+          <div class="toolbar-group">
+            <button class="control-button" id="shareBtn" aria-label="Share screen">
+              <i class="fa-solid fa-display"></i>
+              <span>Share</span>
+            </button>
+            <button class="control-button" id="reactionBtn" aria-label="Send a reaction">
+              <i class="fa-regular fa-face-smile"></i>
+              <span>React</span>
+            </button>
+            <button class="control-button" id="peopleBtn" aria-label="Show participants">
+              <i class="fa-solid fa-users"></i>
+              <span>People</span>
+            </button>
+            <button class="control-button active" id="chatBtn" aria-label="Show chat" aria-pressed="true">
+              <i class="fa-regular fa-message"></i>
+              <span>Chat</span>
+            </button>
+            <button class="control-button" id="notesBtn" aria-label="Show shared notes">
+              <i class="fa-regular fa-note-sticky"></i>
+              <span>Notes</span>
+            </button>
+          </div>
+
+          <div class="toolbar-group">
+            <button class="leave-button" id="leaveBtn">
+              <i class="fa-solid fa-phone-slash"></i>
+              <span>Leave</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-panel" id="sidePanel">
+        <div class="panel-header">
+          <div>
+            <h2 id="panelTitle">Meeting chat</h2>
+            <p id="panelSubtitle">Messages are shared with the room.</p>
+          </div>
+          <button class="icon-button" id="closePanelBtn" aria-label="Close side panel">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <section class="panel-view" id="chatView">
+          <div class="chat-messages" id="messageadd" aria-live="polite">
+            <div class="empty-state" id="chatEmpty">
+              <span class="empty-icon"><i class="fa-regular fa-comments"></i></span>
+              <strong>Start the conversation</strong>
+              <p>Send a message to everyone in the meeting.</p>
             </div>
+          </div>
+          <form class="chat-composer" id="chatForm">
+            <label class="sr-only" for="chat_message">Write a message</label>
+            <textarea id="chat_message" rows="1" maxlength="2000" placeholder="Message everyone…" required></textarea>
+            <button type="submit" class="send-button" aria-label="Send message">
+              <i class="fa-solid fa-arrow-up"></i>
+            </button>
+          </form>
+          <p class="composer-hint">Enter to send · Shift + Enter for a new line</p>
+        </section>
+
+        <section class="panel-view hidden" id="peopleView">
+          <div class="people-summary">
+            <span class="summary-icon"><i class="fa-solid fa-users"></i></span>
             <div>
-                <div class="main__message_container">
-                    <input type="text" id="chat_message" onkeydown="sendmessage(this)" placeholder="Type message here.." />
-                </div>
+              <strong id="peopleTotal">1 participant</strong>
+              <p>People currently in this room</p>
             </div>
-        </div>
-    </div>
-    <script src="/public/main.js"></script>
-</body>
+          </div>
+          <button class="control-button" id="inviteBtn" type="button" style="width:100%;margin-bottom:10px">
+            <i class="fa-solid fa-link"></i>
+            <span>Copy invite link</span>
+          </button>
+          <div class="participant-list" id="participantList"></div>
+        </section>
 
+        <section class="panel-view hidden" id="notesView">
+          <div class="notes-intro">
+            <span class="summary-icon"><i class="fa-regular fa-note-sticky"></i></span>
+            <div>
+              <strong>Shared meeting notes</strong>
+              <p>Everyone in the room can edit these notes.</p>
+            </div>
+          </div>
+          <label class="sr-only" for="sharedNotes">Meeting notes</label>
+          <textarea id="sharedNotes" class="shared-notes" maxlength="15000" placeholder="Agenda, decisions, action items…"></textarea>
+          <div class="notes-footer">
+            <span id="notesStatus">Ready</span>
+            <span>Shared with this room</span>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <div class="reaction-picker hidden" id="reactionPicker" aria-label="Choose a reaction">
+      <button type="button" data-reaction="👍" aria-label="Thumbs up">👍</button>
+      <button type="button" data-reaction="👏" aria-label="Clap">👏</button>
+      <button type="button" data-reaction="❤️" aria-label="Heart">❤️</button>
+      <button type="button" data-reaction="😂" aria-label="Laugh">😂</button>
+      <button type="button" data-reaction="🎉" aria-label="Celebrate">🎉</button>
+      <button type="button" data-reaction="🙌" aria-label="Hands up">🙌</button>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+</body>
 </html>
